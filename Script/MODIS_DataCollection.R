@@ -22,8 +22,9 @@ modis <- ee$ImageCollection("MODIS/006/MOD09GA")
 modis_500m <- ee$ImageCollection("MODIS/006/MOD09GA") %>%
               ee$ImageCollection$filterDate("2000-02-24", "2021-12-31") %>%
               ee$ImageCollection$filterBounds(ee_roi) %>%
-              ee$ImageCollection$select("sur_ref1_b01", "sur_ref1_b02", "sur_ref1_b03", "sur_ref1_b04", "sur_ref1_b05", "sur_ref1_b06", "sur_ref1_b07")
-  
+              ee$ImageCollection$select("sur_ref1_b01", "sur_ref1_b02", "sur_ref1_b03", "sur_ref1_b04", "sur_ref1_b05", "sur_ref1_b06", "sur_ref1_b07", "QC_500m")
+
+
 
 
 
