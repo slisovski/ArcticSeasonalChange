@@ -11,8 +11,8 @@ library(tidyverse)
 ## U use downloaded data from the natural earth website
 ## and include the largest lakes
 
-map <- read_sf("~/Google Drive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_land/ne_50m_land.shp") %>%
-  st_difference(read_sf("~/Google Drive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_lakes/ne_50m_lakes.shp") %>%
+map <- read_sf("~/GoogleDrive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_land/ne_50m_land.shp") %>%
+  st_difference(read_sf("~/GoogleDrive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_lakes/ne_50m_lakes.shp") %>%
                   mutate(area = st_area(geometry)) %>%
                   filter(area >= quantile(area, probs = 0.9))) %>% st_union()
 
@@ -28,7 +28,7 @@ arctis <- map %>% st_intersection(bbox) %>% st_transform(proj)
 
 ### get biome data
 ### https://www.gislounge.com/terrestrial-ecoregions-gis-data/
-ecoreg   <- read_sf("~/Google Drive/My Drive/GeoDat/Ecoregions2017/Ecoregions2017.shp") %>% 
+ecoreg   <- read_sf("~/GoogleDrive/My Drive/GeoDat/Ecoregions2017/Ecoregions2017.shp") %>% 
   filter(BIOME_NAME %in% c("Tundra", "Boreal Forests/Taiga")) %>% 
   group_by(BIOME_NAME) %>% summarise(geometry = sf::st_union(geometry)) %>% ungroup() %>%
   st_intersection(bbox) %>% st_transform(proj)
@@ -40,6 +40,7 @@ pols <- c(st_bbox(c(xmin =  126-7.5, ymin = 50, xmax =  126+7.5, ymax = 90)) %>%
   st_cast("LINESTRING") %>% st_sample(2000, type = "regular") %>% st_cast("POLYGON") %>%
   st_transform(proj)
 
+st_write(pols, "pols.shp")
 
 ### plot
 p1 <-   ggplot() + 
