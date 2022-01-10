@@ -1,6 +1,6 @@
 # Load packages
 library(rgee)
-library(dplyr)
+library(dplyr) ## not nessesary if you load tidyverse
 library(rgdal)
 library(rnaturalearth)
 library(rnaturalearthdata)
@@ -10,7 +10,7 @@ library(tidyverse)
 ee_Initialize()
 
 # Load the Study Areas
-ee_roi <- st_read(system.file("pols.shp", package="sf")) %>%
+ee_roi <- st_read("Data/StudyAreas/pols.shp") %>%
   st_geometry() %>%
   sf_as_ee()
 
