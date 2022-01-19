@@ -2,6 +2,7 @@
 library(rgee)
 library(sf); sf::sf_use_s2(FALSE)
 library(tidyverse)
+library(cptcity)
 
 ee_Initialize()
 
@@ -90,7 +91,7 @@ testPlot <- Mod09ga_masked$
 ndvi_vis <- list(
   min = 0.05,
   max = 1,
-  palette = c("yellow", "green")
+  palette = cpt('grass_ndvi', 10)
 )
 
 
