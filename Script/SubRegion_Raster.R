@@ -7,39 +7,34 @@ library(cptcity)
 ee_Initialize()
 
 
-map <- read_sf("My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_land/ne_50m_land.shp") %>%
-  st_difference(read_sf("My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_lakes/ne_50m_lakes.shp") %>%
-                  mutate(area = st_area(geometry)) %>%
-                  filter(area >= quantile(area, probs = 0.9))) %>% st_union()
+# map <- read_sf("~/Google Drive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_land/ne_50m_land.shp") %>%
+#   st_difference(read_sf("~/Google Drive/My Drive/GeoDat/NaturalEarth/50m_physical/ne_50m_lakes/ne_50m_lakes.shp") %>%
+#                   mutate(area = st_area(geometry)) %>%
+#                   filter(area >= quantile(area, probs = 0.9))) %>% st_union()
+# 
+# ecoreg   <- read_sf("My Drive/GeoDat/Ecoregions2017/Ecoregions2017.shp") %>% 
+#   filter(BIOME_NAME %in% c("Tundra", "Boreal Forests/Taiga")) %>% 
+#   group_by(BIOME_NAME) %>% summarise(geometry = sf::st_union(geometry)) %>% ungroup() %>%
+#   st_intersection(area)
+# area <- map %>% st_intersection(sub_roi)
 
+ecoreg <- st_read("Data/StudyAreas/roi/roi_1_2.shp")
 
-sub_roi <- st_bbox(c(xmin =  126-2.5, ymin = 72, xmax =  127+2.5, ymax = 74)) %>% st_as_sfc() %>% st_set_crs(4326) %>% st_cast("LINESTRING") %>% st_sample(2000, type = "regular") %>% st_cast("POLYGON")
+sub_roi <- st_bbox(c(xmin =  126-2.5, ymin = 72, xmax =  127+2.5, ymax = 74)) %>% 
+  st_as_sfc() %>% st_set_crs(4326)
 
-area <- map %>% st_intersection(sub_roi)
-
-
-ecoreg   <- read_sf("My Drive/GeoDat/Ecoregions2017/Ecoregions2017.shp") %>% 
-  filter(BIOME_NAME %in% c("Tundra", "Boreal Forests/Taiga")) %>% 
-  group_by(BIOME_NAME) %>% summarise(geometry = sf::st_union(geometry)) %>% ungroup() %>%
-  st_intersection(area)
-
-plot(ecoreg) 
-
-st_write(ecoreg, "Data/StudyAreas/roi/sub_roi.shp")
-
-sf_sub_roi <- st_read("Data/StudyAreas/roi/sub_roi.shp") 
+plot(sub_roi)
+plot(ecoreg %>% st_intersection(sub_roi), add = T)
 
 ## Buffer for GEE selection
-sf_roi <- sf_sub_roi %>% st_buffer(0.2) %>% st_union()
-ee_roi <- sf_as_ee(sf_roi)
-
-center <- st_centroid(area) %>% st_coordinates()
+ee_roi <- sf_as_ee(sub_roi)
+center <- st_centroid(sub_roi) %>% st_coordinates()
 
 ## Modis water mask
 water <- ee$Image("MODIS/MOD44W/MOD44W_005_2000_02_24")$select("water_mask")$Not()
 
 Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
-  filterDate("2018-07-01", "2018-08-31")$
+  filterDate("2018-02-01", "2018-10-31")$
   filterBounds(ee_roi)$
   map(function(image) {
     return(image$mask(water))
@@ -49,12 +44,11 @@ Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
     return(image$addBands(ndvi))
   })
 
-
 ## cloud masking (using Modis MOD10A1 cloud mask)
 clouds_ndsi <- ee$ImageCollection('MODIS/006/MOD10A1')$
   select('NDSI_Snow_Cover')$
   map(function(image) {
-    mask = image$lt(-1)$Not()$rename("CloudMask")
+    mask = image$gt(190)$Not()$rename("CloudMask")
     return(image$addBands(mask))
   })
 
@@ -82,4 +76,59 @@ Mod09ga_masked <- innerJoin$map(function(feature) {
 })
 
 
-ee_as_raster()
+# Map$setCenter(center[1], center[2], 9)
+# Map$addLayer(Mod09ga_masked$select(c('sur_refl_b01', 'sur_refl_b04', 'sur_refl_b03'))$first() , list(
+#   min = -100.0,
+#   max = 8000.0), "rgb") +
+# Map$addLayer(Mod09ga_masked$first()$select("ndsi"), list(palette = c("red", "green"), opacity = 0.4), "cloud", FALSE)+
+# Map$addLayer(Mod09ga_masked$first()$clip(ee_roi)$select("ndsi"), list(palette = c("grey", "blue")), "ndsi", FALSE)
+
+
+test <- ee_as_raster(Mod09ga_masked$first()$select("ndsi")$unmask(-9999)$clip(ee_roi))
+
+## ee_as_raster is super inefficient - one raster per time lots of time
+
+ee_image_to_drive() ## saves raster in you google drive
+                    ## loop throught the image.Collection and save each band with a meaningful name
+
+for(i in 1:nrow(dates)) {
+  
+  tmp <- dataset$filterDates(dates[i], dates[i]+24*60*60)$first()
+  
+  task1 <- ee_image_to_drive(tmp$select("ndsi")$clip(ee_roi)$umnask())
+  task1$start()
+  ## check if you can save images with multiple bands
+  
+  task2 <- ee_image_to_drive(tmp$select("ndvi"),
+                             timePrefix = FALSE,
+                             fileNamePrefix = glue::glue("jskbfnsjf{format(dates[i], '%Y-%m-%d')}"))
+  task2$start()
+  
+  ## define folder in Drive etc.
+  ## Description and name of file needs to contain e.g. "MODIS_ndvi_2001-12-11.tif"
+  
+  ## test within a loop (DON'T RUN IF YOU RUN THE LOOP)
+  # test <- raster("path/tif")
+  # plot(test)
+  
+}
+
+
+######
+### you've got all the tifs
+##
+## what you want
+
+# Step2
+## For example looping through all raster files (both NDVI and NDSI) and get Data into an Array
+## array[pixels, dates, index]
+
+
+plot(dataset$date, dataset$ndvi)
+points(dataset$date, dataset$ndsi)
+
+
+
+
+
+
