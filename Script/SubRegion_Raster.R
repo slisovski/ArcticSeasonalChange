@@ -34,7 +34,7 @@ center <- st_centroid(sub_roi) %>% st_coordinates()
 water <- ee$Image("MODIS/MOD44W/MOD44W_005_2000_02_24")$select("water_mask")$Not()
 
 Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
-  filterDate("2018-02-01", "2018-10-31")$
+  filterDate("2018-07-01", "2018-07-31")$
   filterBounds(ee_roi)$
   map(function(image) {
     return(image$mask(water))
@@ -84,34 +84,54 @@ Mod09ga_masked <- innerJoin$map(function(feature) {
 # Map$addLayer(Mod09ga_masked$first()$clip(ee_roi)$select("ndsi"), list(palette = c("grey", "blue")), "ndsi", FALSE)
 
 
-test <- ee_as_raster(Mod09ga_masked$first()$select("ndsi")$unmask(-9999)$clip(ee_roi))
+# test <- ee_as_raster(Mod09ga_masked$first()$select("ndsi")$unmask(-9999),
+#                      region = ee_roi,
+#                      scale = Mod09ga_masked$select("ndsi")$first()$projection()$nominalScale()$getInfo(),
+#                      crs = "EPSG:4326")
+# # test[test[]<9000] <- NA
+# raster::plot(test)
+# plot(sub_roi %>% st_transform(proj4string(test)), add = T)
 
 ## ee_as_raster is super inefficient - one raster per time lots of time
 
-ee_image_to_drive() ## saves raster in you google drive
+# ee_image_to_drive() ## saves raster in you google drive
                     ## loop throught the image.Collection and save each band with a meaningful name
-
 for(i in 1:nrow(dates)) {
   
-  tmp <- dataset$filterDates(dates[i], dates[i]+24*60*60)$first()
+  tmp <- Mod09ga_masked$filterDate(format(dates$time_start[i], "%Y-%m-%d"), format(dates$time_start[i]+24*60*60, "%Y-%m-%d"))$first()
   
-  task1 <- ee_image_to_drive(tmp$select("ndsi")$clip(ee_roi)$umnask())
+  task1 <- ee_image_to_drive(tmp$select("ndsi")$unmask(-9999),
+                             region = ee_roi,                            
+                             scale = tmp$select("ndsi")$projection()$nominalScale()$getInfo(),
+                             crs = "EPSG:4326",
+                             timePrefix = FALSE,
+                             fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
+                             fileFormat = "GeoTIFF",
+                             folder = "ndsi")
+  
   task1$start()
   ## check if you can save images with multiple bands
   
-  task2 <- ee_image_to_drive(tmp$select("ndvi"),
+  task2 <- ee_image_to_drive(tmp$select("ndvi")$unmask(-9999),
+                             region = ee_roi,                            
+                             scale = tmp$select("ndvi")$projection()$nominalScale()$getInfo(),
+                             crs = "EPSG:4326",
                              timePrefix = FALSE,
-                             fileNamePrefix = glue::glue("jskbfnsjf{format(dates[i], '%Y-%m-%d')}"))
+                             fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
+                             fileFormat = "GeoTIFF",
+                             folder = "ndvi")
   task2$start()
   
   ## define folder in Drive etc.
-  ## Description and name of file needs to contain e.g. "MODIS_ndvi_2001-12-11.tif"
+  ## Description and name of file needs to contain e.g. "2001-12-11.tif"
   
   ## test within a loop (DON'T RUN IF YOU RUN THE LOOP)
   # test <- raster("path/tif")
   # plot(test)
   
+  
 }
+
 
 
 ######
