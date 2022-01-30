@@ -34,7 +34,7 @@ center <- st_centroid(sub_roi) %>% st_coordinates()
 water <- ee$Image("MODIS/MOD44W/MOD44W_005_2000_02_24")$select("water_mask")$Not()
 
 Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
-  filterDate("2018-07-01", "2018-07-31")$
+  filterDate("2018-07-01", "2018-08-01")$
   filterBounds(ee_roi)$
   map(function(image) {
     return(image$mask(water))
@@ -96,6 +96,9 @@ Mod09ga_masked <- innerJoin$map(function(feature) {
 
 # ee_image_to_drive() ## saves raster in you google drive
                     ## loop throught the image.Collection and save each band with a meaningful name
+
+dates <- ee_get_date_ic(Mod09ga_masked)
+
 for(i in 1:nrow(dates)) {
   
   tmp <- Mod09ga_masked$filterDate(format(dates$time_start[i], "%Y-%m-%d"), format(dates$time_start[i]+24*60*60, "%Y-%m-%d"))$first()
@@ -103,7 +106,6 @@ for(i in 1:nrow(dates)) {
   task1 <- ee_image_to_drive(tmp$select("ndsi")$unmask(-9999),
                              region = ee_roi,                            
                              scale = tmp$select("ndsi")$projection()$nominalScale()$getInfo(),
-                             crs = "EPSG:4326",
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
@@ -115,7 +117,6 @@ for(i in 1:nrow(dates)) {
   task2 <- ee_image_to_drive(tmp$select("ndvi")$unmask(-9999),
                              region = ee_roi,                            
                              scale = tmp$select("ndvi")$projection()$nominalScale()$getInfo(),
-                             crs = "EPSG:4326",
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",

@@ -12,7 +12,7 @@ roi    <- st_point(c(98.54, 76.08)) %>% st_sfc() %>% st_set_crs(4326) %>%
 bbox   <- st_bbox(roi %>% st_transform(4326)) %>% st_as_sfc() %>% st_transform(4326)
 
 
-## flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
+# flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
 drive         <- "My Drive/Master Thesis/rasters/ndvi/"
 flsModis      <- list.files(drive, pattern = "MODIS*") # I got a correct list with 365 tifs for the year 2018
 flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(strsplit(x[3], ".tif")))) ## that may need to be adjusted depending on your file name. This looked OK as well
@@ -27,10 +27,10 @@ modisArray <- array(dim = c(nrow(crds), length(flsModis), 2)) ## array[pixels, d
 for(i in 1:length(flsModis)) {
   
   ndvi <- raster(paste0(drive, flsModis[i])); proj4string(r0) <- rast_proj
-  ndsi <- raster(gsub("ndvi", "ndsi", paste0(drive, flsModis[i]))); proj4string(r0) <- rast_proj
+  ndsi <- raster(gsub("NDVI", "NDSI", paste0(drive, flsModis[i]))); proj4string(r0) <- rast_proj
   
-  modisArray[,i,1] <- ndsi[]
-  modisArray[,i,2] <- ndvi[]
+  modisArray[,i,1] <- ndvi[] 
+  modisArray[,i,2] <- ndsi[] 
   
 }
 
