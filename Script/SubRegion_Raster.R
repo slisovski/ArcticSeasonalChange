@@ -108,7 +108,7 @@ for(i in 1:nrow(dates)) {
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
-                             folder = "rasters1")
+                             folder = "rasters")
   
   task1$start()
   ## check if you can save images with multiple bands
@@ -118,7 +118,7 @@ for(i in 1:nrow(dates)) {
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
-                             folder = "rasters1")
+                             folder = "rasters")
   task2$start()
   
   ## define folder in Drive etc.

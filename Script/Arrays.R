@@ -14,7 +14,7 @@ bbox   <- st_bbox(roi %>% st_transform(4326)) %>% st_as_sfc() %>% st_transform(4
 
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
 drive         <- "My Drive/Master Thesis/rasters/"
-flsModis      <- list.files(drive, pattern = "MODIS_ndvi*")   # I got a correct list with 365 tifs for the year 2018
+flsModis      <- list.files(drive, pattern = "MODIS_ndvi*")   
 flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(strsplit(x[3], ".tif")))) ## that may need to be adjusted depending on your file name. This looked OK as well
 
 ### template of rasters
@@ -34,7 +34,7 @@ for(i in 1:length(flsModis)) {
   
 }
 
-modisArray # Here I get the NA dataframe
+modisArray 
 
 matplot(flsModis_date, modisArray[,,1], pch = 16, cex = 0.2, col = "cornflowerblue", type = "o")
 ## if that does not work
