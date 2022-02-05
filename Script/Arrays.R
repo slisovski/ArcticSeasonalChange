@@ -13,8 +13,8 @@ bbox   <- st_bbox(roi %>% st_transform(4326)) %>% st_as_sfc() %>% st_transform(4
 
 
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
-drive         <- "My Drive/Master Thesis/rasters/ndvi/"
-flsModis      <- list.files(drive, pattern = "MODIS*") # I got a correct list with 365 tifs for the year 2018
+drive         <- "My Drive/Master Thesis/rasters/"
+flsModis      <- list.files(drive, pattern = "MODIS_ndvi*")   # I got a correct list with 365 tifs for the year 2018
 flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(strsplit(x[3], ".tif")))) ## that may need to be adjusted depending on your file name. This looked OK as well
 
 ### template of rasters
@@ -22,12 +22,12 @@ rast_proj <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +u
 r0   <- raster(paste0(drive, flsModis[1])); proj4string(r0) <- rast_proj
 crds <- r0 %>% projectRaster(crs = CRS("+proj=longlat")) %>% coordinates()
 
-modisArray <- array(dim = c(nrow(crds), length(flsModis), 2)) ## array[pixels, dates, c(ndsi, ndvi)]
+modisArray <- array(dim = c(nrow(crds), length(c(flsModis)), 2)) ## array[pixels, dates, c(ndsi, ndvi)]
 
 for(i in 1:length(flsModis)) {
   
   ndvi <- raster(paste0(drive, flsModis[i])); proj4string(r0) <- rast_proj
-  ndsi <- raster(gsub("NDVI", "NDSI", paste0(drive, flsModis[i]))); proj4string(r0) <- rast_proj
+  ndsi <- raster(gsub("MODIS_ndvi", "MODIS_ndsi", paste0(drive, flsModis[i]))); proj4string(r0) <- rast_proj
   
   modisArray[,i,1] <- ndvi[] 
   modisArray[,i,2] <- ndsi[] 

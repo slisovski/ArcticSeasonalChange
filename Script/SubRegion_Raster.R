@@ -23,7 +23,7 @@ ecoreg <- st_read("Data/StudyAreas/roi/roi_1_2.shp")
 sub_roi <- st_bbox(c(xmin =  126-2.5, ymin = 72, xmax =  127+2.5, ymax = 74)) %>% 
   st_as_sfc() %>% st_set_crs(4326)
 
-plot(sub_roi)
+plot(roi)
 plot(ecoreg %>% st_intersection(sub_roi), add = T)
 
 ## Buffer for GEE selection
@@ -103,24 +103,22 @@ for(i in 1:nrow(dates)) {
   
   tmp <- Mod09ga_masked$filterDate(format(dates$time_start[i], "%Y-%m-%d"), format(dates$time_start[i]+24*60*60, "%Y-%m-%d"))$first()
   
-  task1 <- ee_image_to_drive(tmp$select("ndsi")$unmask(-9999),
+  task1 <- ee_image_to_drive(tmp$select("ndsi"),
                              region = ee_roi,                            
-                             scale = tmp$select("ndsi")$projection()$nominalScale()$getInfo(),
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
-                             folder = "ndsi")
+                             folder = "rasters1")
   
   task1$start()
   ## check if you can save images with multiple bands
   
-  task2 <- ee_image_to_drive(tmp$select("ndvi")$unmask(-9999),
-                             region = ee_roi,                            
-                             scale = tmp$select("ndvi")$projection()$nominalScale()$getInfo(),
+  task2 <- ee_image_to_drive(tmp$select("ndvi"),
+                             region = ee_roi,
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
-                             folder = "ndvi")
+                             folder = "rasters1")
   task2$start()
   
   ## define folder in Drive etc.
