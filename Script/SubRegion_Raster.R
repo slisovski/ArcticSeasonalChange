@@ -20,11 +20,11 @@ ee_Initialize()
 
 ecoreg <- st_read("Data/StudyAreas/roi/roi_1_2.shp")
 
-sub_roi <- st_bbox(c(xmin =  126-2.5, ymin = 72, xmax =  127+2.5, ymax = 74)) %>% 
+sub_roi <- st_bbox(c(xmin =  126-1.5, ymin = 72.5, xmax =  127+1.5, ymax = 73)) %>% 
   st_as_sfc() %>% st_set_crs(4326)
 
-plot(roi)
-plot(ecoreg %>% st_intersection(sub_roi), add = T)
+# plot(sub_roi)
+# plot(ecoreg %>% st_intersection(sub_roi), add = T)
 
 ## Buffer for GEE selection
 ee_roi <- sf_as_ee(sub_roi)
@@ -34,7 +34,7 @@ center <- st_centroid(sub_roi) %>% st_coordinates()
 water <- ee$Image("MODIS/MOD44W/MOD44W_005_2000_02_24")$select("water_mask")$Not()
 
 Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
-  filterDate("2018-07-01", "2018-08-01")$
+  filterDate("2018-05-15", "2018-06-15")$
   filterBounds(ee_roi)$
   map(function(image) {
     return(image$mask(water))
@@ -77,10 +77,11 @@ Mod09ga_masked <- innerJoin$map(function(feature) {
 
 
 # Map$setCenter(center[1], center[2], 9)
+# Map$addLayer(ee_roi)
 # Map$addLayer(Mod09ga_masked$select(c('sur_refl_b01', 'sur_refl_b04', 'sur_refl_b03'))$first() , list(
 #   min = -100.0,
 #   max = 8000.0), "rgb") +
-# Map$addLayer(Mod09ga_masked$first()$select("ndsi"), list(palette = c("red", "green"), opacity = 0.4), "cloud", FALSE)+
+# Map$addLayer(Mod09ga_masked$median()$select("ndvi"), list(palette = c("red", "green"), opacity = 0.4), "cloud", FALSE)+
 # Map$addLayer(Mod09ga_masked$first()$clip(ee_roi)$select("ndsi"), list(palette = c("grey", "blue")), "ndsi", FALSE)
 
 
@@ -103,22 +104,26 @@ for(i in 1:nrow(dates)) {
   
   tmp <- Mod09ga_masked$filterDate(format(dates$time_start[i], "%Y-%m-%d"), format(dates$time_start[i]+24*60*60, "%Y-%m-%d"))$first()
   
-  task1 <- ee_image_to_drive(tmp$select("ndsi"),
+  task1 <- ee_image_to_drive(tmp$select("ndsi")$unmask(-9999),
                              region = ee_roi,                            
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
                              folder = "rasters")
+  # Map$addLayer(tmp$select("ndsi"), list(min = -1, max = 1, palette = c("green", "blue"), opacity = 0.4), "cloud", TRUE)
   
   task1$start()
   ## check if you can save images with multiple bands
   
-  task2 <- ee_image_to_drive(tmp$select("ndvi"),
+  task2 <- ee_image_to_drive(tmp$select("ndvi")$unmask(-9999),
                              region = ee_roi,
                              timePrefix = FALSE,
                              fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
                              fileFormat = "GeoTIFF",
                              folder = "rasters")
+  
+  
+  # Map$addLayer(tmp$select("ndvi"), list(min = 0, max = 1, palette = c("yellow", "green"), opacity = 0.4), "cloud", TRUE)
   task2$start()
   
   ## define folder in Drive etc.
