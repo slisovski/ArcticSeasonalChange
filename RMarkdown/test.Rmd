@@ -1,0 +1,432 @@
+---
+title: "Quantifying the response of Landscape Seasonality and its Predictability across Arctic gradients in the context of Climate Change"
+output:
+  html_document: 
+    code_folding: hide
+editor_options: 
+  
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+Climate change affects multiple regions worldwide, with changing precipitation patterns, increasing frequency of extreme weather events and increasing air temperatures (IPCC, 2019). In recent decades, one of the most affected regions are the permafrost regions (Lara, Nitze, Grosse, Martin & McGuire, 2018), as they are among the most vulnerable and dynamic systems globally. Understanding and monitoring the effects of climate change is crucial in predicting permafrost development in the near future.
+
+Seasonality is an important feature of our planet that influences almost all natural systems (Fretwell, 1972). The rate of change in spring/autumn, the amplitude of annual change, the timing of increase in temperature of primary productivity as well as the timing of its annual maximum, are all relevant to some processes. Seasonality, however, varies geographically (Lisovski, Ramenofsky & Wingfield, 2017) across Arctic gradients.
+
+While seasonality is a well-known structuring force on biodiversity, our understanding of its influence on local communities is not complete without understanding its predictability (Tonkin et al., 2017). For example, predictability of seasonal variation could be a useful statistical measure to see how well we can predict the start of the season for each year. In addition, despite knowing that landscape seasonality is changing across the world and notably in the Arctic regions, we also know very little about changing patterns of predictability.
+
+### Objectives
+
+Guided by the major question, how seasonality of primary productivity varies across the Arctic and how recent climate warming may have led to changes in the predictability of seasonal dynamics, I aim to tackle the following objectives:
+
+- Extract seasonal metrices (NDVI and NDSI indices will help with that) for two study areas of the Arctic tundra and taiga.
+
+- Quantify predictability of seasonal metrices over time and investigate potential trends.
+
+- Map resulting trends to identify potential heterogeneity of change between study areas and spatial gradient.
+
+### Methods
+
+The following methods are going to be applied:
+
+- Use of the Google Earth Engine dataset catalog for measuring snow cover and primary productivity on different spatial and temporal scales (MODIS 500m Data Products).
+
+- Time Series analysis of Seasonality over two decades (2001-2021).
+
+- Data manipulation and analyses using R and the 'rgee' package which integrates Google Earth Engine in the software.
+
+- R for modelling seasonal dynamics and predictability.
+
+- Map spatial variation of seasonal predictability.
+
+
+## Loading the appropriate packages.
+
+```{r, eval = T, collapse = TRUE}
+library(rgee)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf); sf::sf_use_s2(FALSE)
+library(tidyverse)
+library(raster)
+library(ggpubr)
+```
+
+## Data acquisition from Natural Earth and GIS lounge in order to create the study area polygons.
+
+In order to obtain the appropriate shapefile of the study areas, the 'naturalearth' database package was used. From there, the 50m physical land shapefile along with the largest lakes and the biome data including the tundra and boreal forest/taiga were downloaded and integrated. Finally, a bounding box was created for the entire world map which was then projected to sterographic projection.
+
+```{r, eval = F, collapse = TRUE}
+
+## Natural Earth Data
+map <- read_sf("/Users/tasos/Downloads/GeoDat/NaturalEarth/50m_physical/ne_50m_land/ne_50m_land.shp") %>%
+  st_difference(read_sf("/Users/tasos/Downloads/GeoDat/NaturalEarth/50m_physical/ne_50m_lakes/ne_50m_lakes.shp") %>%
+                  st_geometry() %>% st_sf() %>% 
+                  mutate(area = st_area(geometry)) %>%
+                  filter(area >= quantile(area, probs = 0.9))) %>% st_union()
+
+### Bounding box
+bbox   <- st_bbox(c(xmin = -180, ymin = 50, xmax = 180, ymax = 90)) %>% st_as_sfc() %>% st_set_crs(4326) %>%
+  st_cast("LINESTRING") %>% st_sample(1000, type = "regular") %>% st_cast("POLYGON")
+
+### Biome Data
+proj   <- "+proj=stere +lat_0=90 +lat_ts=75"
+ecoreg <- read_sf("/Users/tasos/Downloads/GeoDat/Ecoregions2017/Ecoregions2017.shp") %>% 
+  filter(BIOME_NAME %in% c("Tundra", "Boreal Forests/Taiga")) %>% 
+  group_by(BIOME_NAME) %>% summarise(geometry = sf::st_union(geometry)) %>% ungroup() %>%
+  st_intersection(bbox) %>% st_transform(proj)
+
+### Intersection and projection
+
+arctis <- map %>% st_intersection(bbox) %>% st_transform(proj)
+```
+
+```{r, include = FALSE}
+# save(arctis, file = "Output/arctic.rda")
+# save(ecoreg, file = "Output/ecoreg.rda")
+# save(pols, file = "/Users/tasos/Documents/pols.shp" )
+# save(sub_roi, file = "/Users/tasos/Documents/sub_roi.rda")
+
+load("/Users/tasos/Documents/arctic.rda")
+load("/Users/tasos/Documents/ecoreg.rda")
+load("/Users/tasos/Documents/pols.shp")
+load("/Users/tasos/Documents/sub_roi.rda")
+```
+
+
+
+## Study Sites
+
+Two study sites were selected for this thesis. One is on the Siberian tundra and taiga biome, including the Lena Delta and one area including part of the Yukon region. The polygons were created by creating two bounding boxes with the appropriate coordinates and then transofrmed to the stereographic projection.
+
+```{r, eval = T, collapse = TRUE}
+
+
+### Plot of the regions
+p1 <-   ggplot() + 
+  geom_sf(data = arctis, fill = "grey90", col = "grey50", size = 0.3) + 
+  geom_sf(data = pols, fill = NA, col = "grey30", size = 0.4) + 
+  geom_sf(data = pols %>% st_intersection(arctis), fill = "grey60", col = NA, size = 0.6) +
+  geom_label(data = st_centroid(pols) %>% st_coordinates() %>% as.data.frame(), aes(x=X, y=Y, label = c("A1", "A2"))) +
+  scale_y_continuous(breaks = seq(50, 90, by = 10)) +
+  theme_bw() +
+  xlab(NULL) + ylab(NULL) +
+  theme(axis.ticks.x = element_blank(), 
+        axis.text.x = element_blank())
+
+prj1 <- glue::glue("+proj=stere +lat_0=90 +lon_0={(st_centroid(pols)[1] %>% st_transform(4326) %>% st_coordinates())[1,1]}")
+p2 <- ggplot() +
+  geom_sf(data = pols[1] %>% st_intersection(arctis) %>% st_transform(prj1), fill = "grey60", col = NA, size = 0.6) +
+  geom_sf(data = ecoreg %>% st_intersection(pols[1] %>% st_intersection(arctis)) %>% st_transform(prj1), 
+          mapping = aes(geometry = geometry, fill = BIOME_NAME), col = NA, show.legend = F) +
+  scale_fill_manual(values = c("#40A090", "#608080")) +
+  labs(tag = "A1") +
+  theme_bw()
+
+prj2 <- glue::glue("+proj=stere +lat_0=90 +lon_0={(st_centroid(pols)[2] %>% st_transform(4326) %>% st_coordinates())[1,1]}")
+p3 <- ggplot() +
+  geom_sf(data = pols[2] %>% st_intersection(arctis) %>% st_transform(prj2), fill = "grey60", col = NA, size = 0.6) +
+  geom_sf(data = ecoreg %>% st_intersection(pols[2] %>% st_intersection(arctis)) %>% st_transform(prj2), 
+          mapping = aes(geometry = geometry, fill = BIOME_NAME), col = NA, show.legend = T) +
+  scale_fill_manual(values = c("#40A090", "#608080")) +
+  labs(tag = "A2") +
+  theme_bw()
+
+
+
+ggarrange(p1, p2, p3,
+                    ncol = 2, nrow = 2)
+```
+
+### Creating a smaller subregion
+
+```{r, eval = T, collapse = TRUE}
+# Create a small bounding box in the Siberian study area
+
+
+
+subreg <-   ggplot() + 
+  geom_sf(data = arctis, fill = "grey90", col = "grey50", size = 0.3) + 
+  geom_sf(data = sub_roi, fill = NA, col = "red", size = 1) + 
+  geom_sf(data = sub_roi %>% st_intersection(arctis), fill = "grey60", col = NA, size = 0.6) +
+  theme_bw() +
+  xlab(NULL) + ylab(NULL) +
+  theme(axis.ticks.x = element_blank(), 
+        axis.text.x = element_blank())
+
+subreg
+
+```
+
+### Data acquisition through Google Earth Engine Catalog using R
+
+In order to acquire the datasets we need, 'R' has an in-development package called 'rgee' which integrates Google Earth Engine into R and it helps download whatever dataset catalog needed. So, in our case, the MODIS 'MOD09GA' dataset was downloaded. This product provides bands 1-7 in a daily gridded L2G product in the sinusoidal projection, including 500m reflectance values and geolocation statistics. After getting the dataset, a fate filter was applied in order to get the appropriate dates from the last 2 decades (2001-2021) and filtered the collection to the study areas. Finally, the whole surface reflectance bands 1-7 and the surface reflectance quality assurance band were selected.
+
+```{r, eval = F, collapse = TRUE}
+
+ee_Initialize()
+
+# Load the Study Areas and convert them to ee Object
+ee_roi <- st_read("Data/StudyAreas/pols.shp") %>% 
+          st_geometry() %>% 
+          sf_as_ee()
+
+
+# Get MODIS Dataset 
+modis <- ee$ImageCollection("MODIS/006/MOD09GA")
+
+#Filtering
+modis_500m <- ee$ImageCollection("MODIS/006/MOD09GA") %>%
+              ee$ImageCollection$filterDate("2001-01-01", "2022-01-01") %>%
+              ee$ImageCollection$filterBounds(ee_roi) %>%
+              ee$ImageCollection$select("sur_refl_b01", "sur_refl_b02","sur_refl_b03", "sur_refl_b04", "sur_refl_b05", "sur_refl_b06", "sur_refl_b07", "QC_500m")
+
+```
+
+### Selecting the water and cloud masks and getting the NDVI and NDSI indices.
+
+After getting the MODIS dataset catalog, the process of masking out water and clouds must be applied. This is also possible through 'R' by again selecting the appropriate catalogs. 
+The water mask can be found in a ready to use product called 'MOD44W.006' which has an integrated water mask band. For the cloud masking, the 'MOD10A1.006' dataset was selected, which contains snow cover, snow albedo and quality assessment (QA) data. These data are based on an algorithm that employs a NDSI and other criteria tests. From this catalog, the 'NDSI_Snow_Cover' band was selected. Its provider values above 100 are masked out in this band and they exclude clouds as well. Finally, in order to select the NDVI band, we selected the first two bands from the initial MODIS dataset (MOD09GA) which correspond to the NDVI.
+In the end, all acquired data were joined together, creating the final dataset that we are going to work with.
+So, when the filtering process is finished, we can get the dates we need and save all the raster files for each index, in our workspace.
+
+````{r, eval = FALSE, collapse = TRUE}
+
+# Load the subregion
+ee_roi <- sf_as_ee(sub_roi)
+center <- st_centroid(sub_roi) %>% st_coordinates()
+
+## Modis water mask
+water <- ee$Image("MODIS/MOD44W/MOD44W_005_2000_02_24")$select("water_mask")$Not()
+
+## Cloud masking
+clouds_ndsi <- ee$ImageCollection('MODIS/006/MOD10A1')$
+  select('NDSI_Snow_Cover')$
+  map(function(image) {
+    mask = image$lt(-1)$Not()$rename("CloudMask")
+    return(image$addBands(mask))
+  })
+
+
+Mod09ga <- ee$ImageCollection("MODIS/006/MOD09GA")$
+  filterDate("2001-01-01", "2022-01-01")$
+  filterBounds(ee_roi)$
+  map(function(image) {
+    return(image$mask(water))
+  })$
+  map(function(image) {
+    ndvi = image$normalizedDifference(c('sur_refl_b02', 'sur_refl_b01'))$rename('ndvi')
+    return(image$addBands(ndvi))
+  })
+  
+## Create filter
+  filter = ee$Filter$equals(
+    leftField = "system:time_start",
+    rightField = "system:time_start"
+  )
+  ## Create the join
+  simpleJoin <- ee$Join$inner()
+  ## Inner join
+  innerJoin <- ee$ImageCollection(simpleJoin$apply(Mod09ga, clouds_ndsi, filter))
+
+## Join, select, mask
+Mod09ga_masked <- innerJoin$map(function(feature) {
+      return(ee$Image$cat(feature$get('primary'), feature$get('secondary')))
+    })$map(function(image) {
+      ndvi = image$select("ndvi")
+      ndsi = image$select("NDSI_Snow_Cover")$rename("ndsi")
+      mask = image$select("CloudMask")
+      return(image$select(c('sur_refl_b01', 'sur_refl_b04', 'sur_refl_b03'))$addBands(ndvi)$addBands(ndsi)$updateMask(mask))
+    })
+
+for(i in 1:nrow(dates)) {
+  
+  tmp <- Mod09ga_masked$filterDate(format(dates$time_start[i], "%Y-%m-%d"), format(dates$time_start[i]+24*60*60, "%Y-%m-%d"))$first()
+  
+  task1 <- ee_image_to_drive(tmp$select("ndsi")$unmask(-9999),
+                             region = ee_roi,                            
+                             timePrefix = FALSE,
+                             fileNamePrefix = glue::glue('MODIS_ndsi_{format(dates$time_start[i], "%Y-%m-%d")}'),
+                             fileFormat = "GeoTIFF",
+                             folder = "rasters")
+
+  
+  task1$start()
+
+  task2 <- ee_image_to_drive(tmp$select("ndvi")$unmask(-9999),
+                             region = ee_roi,
+                             timePrefix = FALSE,
+                             fileNamePrefix = glue::glue('MODIS_ndvi_{format(dates$time_start[i], "%Y-%m-%d")}'),
+                             fileFormat = "GeoTIFF",
+                             folder = "rasters")
+  
+  
+  task2$start()
+  
+  
+  
+}
+  
+````
+
+
+### Plotting Time Series of Indices
+
+In this section, we are creating a Time Series plot for NDVI and NDSI. In order to acquire the dataframe we need in order to plot, we need to first create an array including the two indices and the pixels of the study area by creating a template of rasters and from it extracting the number of pixels available in that raster. We then create a loop assigning each raster of indices to the appropriate column and dimension of the array.
+
+```{r, eval = FALSE, include=T}
+
+
+# Loading the rasters from2 018
+drive         <-"/Users/tasos/Downloads/rasters/2018/"
+
+
+flsModis      <- list.files(drive, pattern = "MODIS_ndvi*", recursive = T)   
+flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(strsplit(x[3], ".tif"))))
+
+### Template of rasters
+rast_proj <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
+r0   <- raster(paste0(drive, flsModis[1])); proj4string(r0) <- rast_proj
+
+
+crds <- r0 %>% coordinates() %>% as.data.frame() %>% st_as_sf(coords = c("y", "y")) %>%
+  st_set_crs(rast_proj) %>% st_transform(4326) %>% st_coordinates() %>% as_tibble() %>% 
+  rownames_to_column(var = "index") %>% filter(!is.na(r0[])) %>% mutate(index = as.numeric(index))
+
+# Create an array of pixels, dates and Indices
+modisArray <- array(dim = c(nrow(crds), length(c(flsModis)), 2))
+
+for(i in 1:length(flsModis)) {
+  
+  ndvi <- raster(paste0(drive, flsModis[i]))
+  ndsi <- raster(gsub("MODIS_ndvi", "MODIS_ndsi", paste0(drive, flsModis[i])))
+  
+  modisArray[,i,1] <- ifelse(ndvi[][crds$index] < -1000, NA, ndvi[][crds$index])
+  modisArray[,i,2] <- ifelse(ndsi[][crds$index] < -1000, NA, ndsi[][crds$index])
+  
+}
+
+#save(modisArray, file = "Output/modisArray.rda")
+#writeRaster(ndvi, "ndvi.tif")
+#writeRaster(ndsi, "ndsi.tif")
+```
+
+Afterwards, the array needs to be converted into a dataframe in order to be able to plot it. For better plotting, the NDSI values were converted to match the scale of NDVI values.
+
+
+````{r, eval = T, collapse = TRUE}
+
+load("/Users/tasos/Documents/modisArray.rda")
+
+# Convertion of array to dataframe
+
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value))
+
+# Time Series Plot                                 
+plotArray <- ggplot(meltArray, aes(x = DOY, y = Value, color = Index)) + geom_point() +
+# Custom the Y scales:
+scale_y_continuous(
+
+  # Features of the first axis
+  name = "NDSI",
+
+  # Add a second axis and specify its features
+  sec.axis = sec_axis(trans = ~.* 1 , name = "NDVI")
+)
+
+
+library(hrbrthemes)
+plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "green")) + theme_ipsum()
+
+
+````
+
+### Various tasks
+
+After having our dataframe, we can play around with different statistics and we can extract various conditions needed for our research. For example, we can get the first day of the year where the NDSI value falls below 0.3, signaling the potential start of  snowmelt. Also, we can put the pixel based analysis back on a map (e.g. create a raster of the median or the standard deviation of NDVI for a specific year, or across different years).
+
+```{r, eval = T, collapse=TRUE}
+
+## Replace negative NDVI values with NA (NDSI values can not go below 0, so we can just set all negative values to NA)
+
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+                           mutate(Value = ifelse(Value < 0, NA, Value))
+
+# Time Series Plot                                 
+plotArray <- ggplot(meltArray, aes(x = DOY, y = Value, color = Index)) + geom_point() +
+# Custom the Y scales:
+scale_y_continuous(
+
+  # Features of the first axis
+  name = "NDSI",
+
+  # Add a second axis and specify its features
+  sec.axis = sec_axis(trans = ~.* 1 , name = "NDVI")
+)
+
+
+library(hrbrthemes)
+plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "green")) + theme_ipsum()
+
+
+
+
+## Get the first day of the year when NDSI falls below 0.3
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+                           group_split(Index)
+
+snowmelt <- meltArray[[1]] %>%   
+  filter(Value < 0.3) %>% 
+  slice(1)
+
+snowmelt
+
+
+
+
+## Get the 90th percentile values of Indices
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+                           group_by(Index) %>%
+                           summarise(percent90 = quantile(Value, probs =0.9, na.rm = T))
+meltArray
+
+
+# Get statistics of Indices
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+                           group_split(Index)
+
+# e.g. NDSI statistics
+library(doBy)
+summaryBy(Value ~ Index, data = meltArray[[1]], 
+          FUN = list(mean, max, min, median, sd), na.rm = T)
+
+
+
+
+
+```

@@ -13,7 +13,7 @@ bbox   <- st_bbox(roi %>% st_transform(4326)) %>% st_as_sfc() %>% st_transform(4
 
 
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
-drive         <- "My Drive/Master Thesis/rasters/"
+drive         <- "/Users/tasos/Documents/rasters/"
 ## Simeon drive
 # drive         <- "~/Google Drive/My Drive/rasters/"
 flsModis      <- list.files(drive, pattern = "MODIS_ndvi*", recursive = T)   
@@ -82,5 +82,83 @@ scale_y_continuous(
 # Add palette and theme
 library(hrbrthemes)
 plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "green")) + theme_ipsum()
+
+
+
+## Replace negative NDVI values with NA (NDSI values can not go below 0, so we can just set all negative values to NA)
+
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+  mutate(Value = ifelse(Value < 0, NA, Value))
+
+meltArray$DOY <- as.numeric(meltArray$DOY)
+
+# Time Series Plot                                 
+plotArray <- ggplot(meltArray, aes(x = DOY, y = Value, color = Index)) + geom_point() +
+  # Custom the Y scales:
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "NDSI",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(trans = ~.* 1 , name = "NDVI")
+  )
+
+
+library(hrbrthemes)
+plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "green")) + theme_ipsum()
+
+
+
+
+## Get the first day of the year when NDSI falls below 0.3
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+  group_split(Index)
+
+snowmelt <- meltArray[[1]] %>%   
+  filter(Value < 0.3) %>% 
+  slice(1)
+
+snowmelt
+
+
+
+
+## Get the 90th percentile values of Indices
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+  group_by(Index) %>%
+  summarise(percent90 = quantile(Value, probs =0.9, na.rm = T))
+meltArray
+
+
+# Get statistics of Indices
+meltArray <- reshape2::melt(modisArray)
+colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
+meltArray$Index <- as.character(meltArray$Index)
+meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
+  group_split(Index)
+
+# e.g. NDSI statistics
+library(doBy)
+summaryBy(Value ~ Index, data = meltArray[[1]], 
+          FUN = list(mean, max, min, median, sd), na.rm = T)
+
+
+
+
+
 
 
