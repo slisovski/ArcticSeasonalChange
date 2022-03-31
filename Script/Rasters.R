@@ -6,8 +6,8 @@ library(tidyverse)
 # Load Driver and Array
 drive         <- "/Users/tasos/Documents/rasters_final/"
 load("Array2014-2017.rda")
-## Simeon drive
-# drive         <- "~/Google Drive/My Drive/rasters_final/"
+
+# Get rasters
 flsModis      <- list.files(drive, pattern = "MODIS_ndvi*", recursive = T)   
 flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(strsplit(x[3], ".tif")))) ## that may need to be adjusted depending on your file name. This looked OK as well
 
@@ -15,11 +15,7 @@ flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(s
 rast_proj <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
 r0   <- raster(paste0(drive, flsModis[1])); proj4string(r0) <- proj
 
-##### This line is making problems, since the projectRaster creates a different resolution
-##### and thus more crs than the original raster
-# crds <- r0 %>% projectRaster(crs = CRS("+proj=longlat")) %>% coordinates()
 
-#### Solution
 crds <- r0 %>% coordinates() %>% as.data.frame() %>% st_as_sf(coords = c("y", "y")) %>%
   st_set_crs(rast_proj) %>% st_transform(4326) %>% st_coordinates() %>% as_tibble() %>% 
   rownames_to_column(var = "index") %>% filter(!is.na(r0[])) %>% mutate(index = as.numeric(index))
@@ -32,31 +28,34 @@ dim(modisArray)
 medPxl <- apply(modisArray, c(1,3), median, na.rm = T)
 medNDVI <- r0
 medNDVI[!is.na(r0[])] <- medPxl[,1]
+
 plot(medNDVI)
 
 
-# Plot of mean
-meanPxl <- apply(modisArray, c(1,3), mean, na.rm = T)
-meanNDVI <- r0
-medNDVI[!is.na(r0[])] <- meanPxl[,1]
-plot(meanNDVI)
+# Plot of median minus standard deviation
+sdPxl <- apply(modisArray, c(1,3), sd, na.rm = T)
+sdNDVI <- r0
+sdNDVI[!is.na(r0[])] <- sdPxl[,1]
+
+
+plot(medNDVI-sdNDVI)
+
+
+
+
 
 
 # Create dataframe
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
+meltArray <- reshape2::melt(modisArray) %>% setNames(c("Pixel", "indexDate", "Index", "Value")) %>%
+  filter(!is.na(Value)) %>%
+  mutate(date = flsModis_date[indexDate],
+         year = as.numeric(format(date, "%Y")),
+         Value = ifelse(Index == 1 & Value<0.05, NA, Value),
+         Value = ifelse(Index == 2, Value / 100, Value))
 
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value),
-                                  Year  = case_when(DOY <= 365 ~ "2014",
-                                                    DOY <= 730 ~ "2015",
-                                                    DOY <= 1095 ~ "2016",
-                                                    DOY >= 1096 ~ "2017")) %>%
-                           group_split(Index)
+sumArray <- meltArray %>% group_by(Index, year) %>% summarise(Median = median(Value, na.rm = T), 
+                                                              q20 = quantile(Value, probs = 0.2, na.rm = T),
+                                                              q80 = quantile(Value, probs = 0.8, na.rm = T))
 
-Median <- median(meltArray$Value, na.rm = T)
-sd <- sd(meltArray$Value, na.rm = T)
-
-ggplot(meltArray[[1]], aes(x = Year, y = Median)) + 
-  geom_point() + geom_errorbar(aes(ymin = Median-sd, ymax = Median+sd), width = .2)
+ggplot(sumArray %>% filter(Index==2), aes(x = year, y = Median)) + 
+  geom_point() + geom_errorbar(aes(ymin = q20, ymax = q80), width = .2)
