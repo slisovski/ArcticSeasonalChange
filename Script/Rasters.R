@@ -59,3 +59,11 @@ sumArray <- meltArray %>% group_by(Index, year) %>% summarise(Median = median(Va
 
 ggplot(sumArray %>% filter(Index==2), aes(x = year, y = Median)) + 
   geom_point() + geom_errorbar(aes(ymin = q20, ymax = q80), width = .2)
+
+
+# 1st day of snowmelt each year
+snowmelt <- meltArray %>% group_by(year) %>%  
+  filter(Index == 2 & Value < 0.3) %>% 
+  slice(1)
+
+snowmelt
