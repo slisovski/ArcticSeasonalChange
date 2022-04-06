@@ -55,6 +55,7 @@ library(sf); sf::sf_use_s2(FALSE)
 library(tidyverse)
 library(raster)
 library(ggpubr)
+library(knitr)
 ```
 
 ## Data acquisition from Natural Earth and GIS lounge in order to create the study area polygons.
@@ -279,11 +280,11 @@ for(i in 1:nrow(dates)) {
 
 In this section, we are creating a Time Series plot for NDVI and NDSI. In order to acquire the dataframe we need in order to plot, we need to first create an array including the two indices and the pixels of the study area by creating a template of rasters and from it extracting the number of pixels available in that raster. We then create a loop assigning each raster of indices to the appropriate column and dimension of the array.
 
-```{r, eval = FALSE, include=T}
+```{r, eval = T, collapse=TRUE}
 
 
 # Loading the rasters from2 018
-drive         <-"/Users/tasos/Downloads/rasters/2018/"
+drive         <-"/Users/tasos/Documents/20_rasters/"
 
 
 flsModis      <- list.files(drive, pattern = "MODIS_ndvi*", recursive = T)   
@@ -298,6 +299,10 @@ crds <- r0 %>% coordinates() %>% as.data.frame() %>% st_as_sf(coords = c("y", "y
   st_set_crs(rast_proj) %>% st_transform(4326) %>% st_coordinates() %>% as_tibble() %>% 
   rownames_to_column(var = "index") %>% filter(!is.na(r0[])) %>% mutate(index = as.numeric(index))
 
+```
+
+
+```{r, eval = F, collapse=TRUE}
 # Create an array of pixels, dates and Indices
 modisArray <- array(dim = c(nrow(crds), length(c(flsModis)), 2))
 
@@ -311,28 +316,43 @@ for(i in 1:length(flsModis)) {
   
 }
 
-#save(modisArray, file = "Output/modisArray.rda")
+#save(modisArray, file = "/Users/tasos/Documents/array2001_2012.rda")
 #writeRaster(ndvi, "ndvi.tif")
 #writeRaster(ndsi, "ndsi.tif")
 ```
 
-Afterwards, the array needs to be converted into a dataframe in order to be able to plot it. For better plotting, the NDSI values were converted to match the scale of NDVI values.
+Afterwards, the array needs to be converted into a dataframe in order to be able to plot it.
 
 
-````{r, eval = T, collapse = TRUE}
+````{r, eval = F, collapse = TRUE}
 
-load("/Users/tasos/Documents/modisArray.rda")
+#load("/Users/tasos/Documents/array2001_2012.rda")
 
 # Convertion of array to dataframe
 
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value))
+meltArray <- reshape2::melt(modisArray) %>% setNames(c("Pixel", "indexDate", "Index", "Value")) %>%
+  filter(!is.na(Value)) %>%
+  mutate(date = flsModis_date[indexDate],
+         year = as.numeric(format(date, "%Y")),
+         Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
+         Value = ifelse(Index == 'NDVI' & Value<0.05, NA, Value),
+         Value = ifelse(Index == 'NDSI', Value / 100, Value))
+
+#save(meltArray, file = "/Users/tasos/Documents/array2001_2012df.rda")
+
+````     
+
+
+For better plotting, the NDSI values were converted to match the scale of NDVI values.
+
+````{r, eval = T, collapse = TRUE}
+## Get the dataframe
+load("/Users/tasos/Documents/array2001_2012df.rda")
+                          
+
 
 # Time Series Plot                                 
-plotArray <- ggplot(meltArray, aes(x = DOY, y = Value, color = Index)) + geom_point() +
+plotArray <- ggplot(meltArray, aes(x = indexDate, y = Value, color = factor(Index))) + geom_point() +
 # Custom the Y scales:
 scale_y_continuous(
 
@@ -352,81 +372,58 @@ plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "gr
 
 ### Various tasks
 
-After having our dataframe, we can play around with different statistics and we can extract various conditions needed for our research. For example, we can get the first day of the year where the NDSI value falls below 0.3, signaling the potential start of  snowmelt. Also, we can put the pixel based analysis back on a map (e.g. create a raster of the median or the standard deviation of NDVI for a specific year, or across different years).
+After having our dataframe, we can play around with different statistics and we can extract various conditions needed for our research. For example, we can get the first day of the year where the NDSI value falls below 0.3, signaling the potential start of snowmelt. Also, we can put the pixel based analysis back on a map (e.g. create a raster of the median or the standard deviation of NDVI for a specific year, or across different years).
 
-```{r, eval = T, collapse=TRUE}
+```{r, eval = T, collapse=TRUE, results='asis'}
+load("/Users/tasos/Documents/array2001_2012.rda")
+load("/Users/tasos/Documents/array2001_2012df.rda")
 
-## Replace negative NDVI values with NA (NDSI values can not go below 0, so we can just set all negative values to NA)
-
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
-                           mutate(Value = ifelse(Value < 0, NA, Value))
-
-# Time Series Plot                                 
-plotArray <- ggplot(meltArray, aes(x = DOY, y = Value, color = Index)) + geom_point() +
-# Custom the Y scales:
-scale_y_continuous(
-
-  # Features of the first axis
-  name = "NDSI",
-
-  # Add a second axis and specify its features
-  sec.axis = sec_axis(trans = ~.* 1 , name = "NDVI")
-)
-
-
-library(hrbrthemes)
-plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "green")) + theme_ipsum()
-
-
-
-
-## Get the first day of the year when NDSI falls below 0.3
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
-                           group_split(Index)
-
-snowmelt <- meltArray[[1]] %>%   
-  filter(Value < 0.3) %>% 
-  slice(1)
-
-snowmelt
-
-
-
-
-## Get the 90th percentile values of Indices
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
-                           group_by(Index) %>%
-                           summarise(percent90 = quantile(Value, probs =0.9, na.rm = T))
-meltArray
-
-
-# Get statistics of Indices
-meltArray <- reshape2::melt(modisArray)
-colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
-meltArray$Index <- as.character(meltArray$Index)
-meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
-                                  Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
-                           group_split(Index)
-
-# e.g. NDSI statistics
+# e.g. Index Statistics
 library(doBy)
-summaryBy(Value ~ Index, data = meltArray[[1]], 
+summary_indices <- summaryBy(Value ~ Index, data = meltArray,
           FUN = list(mean, max, min, median, sd), na.rm = T)
 
+kable(summary_indices, caption = "Statistics of Indices")
+
+```
+
+
+```{r, eval = T, collapse=TRUE, results='asis'}
+# Plot of median 
+medPxl <- apply(modisArray, c(1,3), median, na.rm = T)
+medNDVI <- r0
+medNDVI[!is.na(r0[])] <- medPxl[,1]
+
+plot_med <- plot(medNDVI)
+
+
+# Plot of median minus standard deviation
+sdPxl <- apply(modisArray, c(1,3), sd, na.rm = T)
+sdNDVI <- r0
+sdNDVI[!is.na(r0[])] <- sdPxl[,1]
+
+plot_medsd <- plot(medNDVI - sdNDVI)
 
 
 
+```
+
+
+```{r, eval = T, collapse=TRUE, results='asis'}
+# Plot of median across the years including standard deviation
+sumArray <- meltArray %>% group_by(Index, year) %>% summarise(Median = median(Value, na.rm = T), 
+                                                              q20 = quantile(Value, probs = 0.2, na.rm = T),
+                                                              q80 = quantile(Value, probs = 0.8, na.rm = T))
+
+ggplot(sumArray %>% filter(Index=='NDSI'), aes(x = year, y = Median)) + 
+  geom_point() + geom_errorbar(aes(ymin = q20, ymax = q80), width = .2) + ggtitle("Plot of NDSI Median across Years")
+
+
+# First day of indication of snowmelt for each year
+snowmelt <- meltArray %>% group_by(year) %>%  
+  filter(Index == 'NDSI' & Value < 0.3) %>% 
+  slice(1)
+
+kable(snowmelt, caption = "NDSI Threshold Table")
 
 ```
