@@ -345,7 +345,7 @@ meltArray <- reshape2::melt(modisArray) %>% setNames(c("Pixel", "indexDate", "In
 
 For better plotting, the NDSI values were converted to match the scale of NDVI values.
 
-````{r, eval = T, collapse = TRUE}
+````{r, eval = F, collapse = TRUE}
 ## Get the dataframe
 load("/Users/tasos/Documents/array2001_2012df.rda")
                           
