@@ -24,10 +24,12 @@ NDSImedian <- t(apply(modisArray[,,2], 1, function(x) {
 
 
 # Make dataframe
-yearMedian <- t(apply(ar[,,1], 1, function(x) {
+yearMedian <- t(apply(modisArray[,,1], 1, function(x) {
   # tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
   sapply(split(data.frame(x, joy = as.numeric(format(flsModis_date, "%j"))), format(flsModis_date, "%Y")), function(y) y[min(which(y[,1]<0.1)),2])
 }))
+
+yearMedian
 
 
 
