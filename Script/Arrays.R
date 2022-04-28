@@ -18,6 +18,7 @@ rast_proj <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +u
 r0   <- raster(paste0(drive, flsModis$path[1])); proj4string(r0) <- rast_proj
 
 grid_bbox <- as(extent(r0), "SpatialPolygons") %>% st_as_sf() %>% st_make_grid(cellsize = 25000)
+text(grid_bbox %>% st_centroid() %>% st_coordinates(), as.character(1:length(grid_bbox)))
 chunck    <- grid_bbox[15]
 
 indexRast <- rasterize(as(chunck, "Spatial"), r0)

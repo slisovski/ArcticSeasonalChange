@@ -12,9 +12,9 @@ flsModis_date <- as.POSIXct(sapply(strsplit(flsModis, "_"), function(x) unlist(s
 dim(modisArray)
 
 # Calculate the median of NDVI and NDVI for each year
-NDVImedian <- t(apply(modisArray[,,1], 1, function(x) {
-  modisArray[modisArray[,,1] < 0.05] <- NA # Remove the NDVI values below 0.05
-  tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
+NDVImedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
+  chunckOut$modisArray[chunckOut$modisArray[,,1] < 0.05] <- NA # Remove the NDVI values below 0.05
+  tapply(x, format(flsModis[2], "%Y"), median, na.rm = T)
 }))
 
 NDSImedian <- t(apply(modisArray[,,2], 1, function(x) {
@@ -31,6 +31,25 @@ yearMedian <- t(apply(modisArray[,,1], 1, function(x) {
 
 yearMedian
 
+
+medPxl <- apply(chunckOut$modisArray, c(1,3), median, na.rm = T)
+
+tbl <- tibble(date = rep(chunckOut$date, each = dim(chunckOut$modisArray[,,1])[1]),
+       snow = c(chunckOut$modisArray[,,1]))
+
+plot(tbl)
+
+
+
+pxlQuants <- 
+  
+  apply(chunckOut$modisArray, c(2,3), median, na.rm = T)
+plot(chunckOut$date, pxlQuants[,1])
+
+
+r0 <- chunckOut$rasterIndex
+r0[!is.na(r0[])] <- medPxl[,1]
+plot(r0)
 
 
 
