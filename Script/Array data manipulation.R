@@ -82,5 +82,15 @@ plot(r0)
 
 
 
-
+opar <- par(mar = c(4,4,1,4), las = 1)
+matplot(chunkOut$date-6*60*60, t(chunkOut$modisArray[,,1]), pch = 16, cex = 1, 
+        col = adjustcolor("darkgreen", alpha.f = 0.4), type = "p",
+        ylim = c(-0.25, 1), xlim = range(chunkOut$date), xlab = "", ylab = "NDVI")
+par(new = T)
+matplot(chunkOut$date+6*60*60, t(chunkOut$modisArray[,,2]), pch = 16, cex = 1, 
+        col = adjustcolor("cornflowerblue", alpha.f = 0.4), type = "p",
+        ylim = c(0,1), xlim = range(chunkOut$date), xlab = "", ylab = "", yaxt  = "n", xaxt = "n")
+axis(4)
+mtext("NDSI", 4, line = 3, las = 3)
+par(opar)
 
