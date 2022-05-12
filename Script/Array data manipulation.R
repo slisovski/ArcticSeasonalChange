@@ -1,14 +1,11 @@
-<<<<<<< HEAD
-=======
 
->>>>>>> 4975f9d3f866e2b5210e52bd30213364559e0e0f
 # Load packages
 library(sf); sf::sf_use_s2(FALSE)
 library(raster)
 library(rgee)
 library(tidyverse)
 
-<<<<<<< HEAD
+
 # Load the array and the df
 load("/Users/tasos/Documents/array2001_2012.rda")
 load("/Users/tasos/Documents/array2001_2012df.rda")
@@ -30,7 +27,7 @@ text(grid_bbox %>% st_centroid() %>% st_coordinates(), as.character(1:length(gri
 chunck    <- grid_bbox[15]
 
 indexRast <- rasterize(as(chunck, "Spatial"), r0)
->>>>>>> 4975f9d3f866e2b5210e52bd30213364559e0e0f
+
 
 
 ##### This line is making problems, since the projectRaster creates a different resolution
@@ -43,7 +40,7 @@ crds <- indexRast %>% coordinates() %>% as.data.frame() %>% st_as_sf(coords = c(
   rownames_to_column(var = "index") %>% filter(!is.na(chunck)) %>% mutate(index = as.numeric(index))
 
 
-<<<<<<< HEAD
+
 dim(chunckOut$modisArray)
 
 # Calculate the median of NDVI and NDVI for each year
@@ -55,7 +52,7 @@ NDVImedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
 NDSImedian <- t(apply(chunckOut$modisArray[,,2], 1, function(x) {
   chunckOut$modisArray[,,2] <- chunckOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
   tapply(x, format(chunckOut$date, "%Y"), median, na.rm = T)
-=======
+
 # Load the Chunk
 load("/Users/tasos/Documents/chunk.rda")
 
@@ -72,12 +69,11 @@ NDVImedian <- t(apply(chunkOut$modisArray[,,1], 1, function(x) {
 NDSImedian <- t(apply(chunkOut$modisArray[,,2], 1, function(x) {
   chunkOut$modisArray[,,2] <- chunkOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
   tapply(x, format(chunkOut$date, "%Y"), median, na.rm = T)
->>>>>>> 4975f9d3f866e2b5210e52bd30213364559e0e0f
 }))
 
 
 # Make dataframe
-<<<<<<< HEAD
+
 yearMedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
   # tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
   sapply(split(data.frame(x, joy = as.numeric(format(chunckOut$date, "%j"))), format(chunckOut$date, "%Y")), function(y) y[min(which(y[,1]<0.1)),2])
@@ -85,7 +81,6 @@ yearMedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
 yearMedian <- t(apply(chunkOut$modisArray[,,1], 1, function(x) {
   # tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
   sapply(split(data.frame(x, joy = as.numeric(format(chunkOut$date, "%Y"))), format(chunkOut$date, "%Y")), function(y) y[min(which(y[,1]<0.1)),2])
->>>>>>> 4975f9d3f866e2b5210e52bd30213364559e0e0f
 }))
 
 yearMedian
@@ -100,14 +95,13 @@ plot(tbl)
 
 
 
-<<<<<<< HEAD
 pxlQuants <- apply(chunckOut$modisArray, c(2,3), median, na.rm = T)
 
 plot(chunckOut$date, pxlQuants[,1])
-=======
+
 pxlQuants <- apply(chunkOut$modisArray, c(2,3), median, na.rm = T)
 plot(chunkOut$date, pxlQuants[,1])
->>>>>>> 4975f9d3f866e2b5210e52bd30213364559e0e0f
+
 
 
 r0 <- chunkOut$rasterIndex
