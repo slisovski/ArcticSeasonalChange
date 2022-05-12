@@ -4,12 +4,11 @@ library(sf); sf::sf_use_s2(FALSE)
 library(raster)
 library(rgee)
 library(tidyverse)
+library(mapview)
 
 
-# Load the array and the df
-load("/Users/tasos/Documents/array2001_2012.rda")
-load("/Users/tasos/Documents/array2001_2012df.rda")
-=======
+# Load the chunk output
+load("/Users/tasos/Documents/chunkOut.rda")
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
 drive         <- "~/Documents/20_rasters/"
 ## Simeon drive 
@@ -43,6 +42,9 @@ crds <- indexRast %>% coordinates() %>% as.data.frame() %>% st_as_sf(coords = c(
 
 dim(chunckOut$modisArray)
 
+
+
+
 # Calculate the median of NDVI and NDVI for each year
 NDVImedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
   chunckOut$modisArray[chunckOut$modisArray[,,1] < 0.05] <- NA # Remove the NDVI values below 0.05
@@ -52,83 +54,96 @@ NDVImedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
 NDSImedian <- t(apply(chunckOut$modisArray[,,2], 1, function(x) {
   chunckOut$modisArray[,,2] <- chunckOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
   tapply(x, format(chunckOut$date, "%Y"), median, na.rm = T)
-
-# Load the Chunk
-load("/Users/tasos/Documents/chunk.rda")
-
-
-
-dim(chunkOut$modisArray)
-
-# Calculate the median of NDVI and NDVI for each year
-NDVImedian <- t(apply(chunkOut$modisArray[,,1], 1, function(x) {
-  chunkOut$modisArray[chunkOut$modisArray[,,1] < 0.05] <- NA # Remove the NDVI values below 0.05
-  tapply(x, format(chunkOut$date, "%Y"), median, na.rm = T)
-}))
-
-NDSImedian <- t(apply(chunkOut$modisArray[,,2], 1, function(x) {
-  chunkOut$modisArray[,,2] <- chunkOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
-  tapply(x, format(chunkOut$date, "%Y"), median, na.rm = T)
 }))
 
 
 # Make dataframe
 
 yearMedian <- t(apply(chunckOut$modisArray[,,1], 1, function(x) {
-  # tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
+  tapply(x, format(chunckOut$date, "%Y"), median, na.rm = T)
   sapply(split(data.frame(x, joy = as.numeric(format(chunckOut$date, "%j"))), format(chunckOut$date, "%Y")), function(y) y[min(which(y[,1]<0.1)),2])
-=======
-yearMedian <- t(apply(chunkOut$modisArray[,,1], 1, function(x) {
-  # tapply(x, format(flsModis_date, "%Y"), median, na.rm = T)
-  sapply(split(data.frame(x, joy = as.numeric(format(chunkOut$date, "%Y"))), format(chunkOut$date, "%Y")), function(y) y[min(which(y[,1]<0.1)),2])
 }))
 
 yearMedian
 
 
-medPxl <- apply(chunkOut$modisArray, c(1,3), median, na.rm = T)
+medPxl <- apply(chunckOut$modisArray, c(1,3), median, na.rm = T)
 
-tbl <- tibble(date = rep(chunkOut$date, each = dim(chunkOut$modisArray[,,1])[1]),
-       snow = c(chunkOut$modisArray[,,1]))
+tbl <- tibble(date = rep(chunckOut$date, each = dim(chunckOut$modisArray[,,1])[1]),
+       snow = c(chunckOut$modisArray[,,2]) / 100) 
 
 plot(tbl)
 
 
-
 pxlQuants <- apply(chunckOut$modisArray, c(2,3), median, na.rm = T)
-
 plot(chunckOut$date, pxlQuants[,1])
 
-pxlQuants <- apply(chunkOut$modisArray, c(2,3), median, na.rm = T)
-plot(chunkOut$date, pxlQuants[,1])
-
-
-
-r0 <- chunkOut$rasterIndex
-r0[!is.na(r0[])] <- medPxl[,1]
+r0 <- chunckOut$rasterIndex
+r0[!is.na(r0[])] <-medAmp -sdAmp
 plot(r0)
 
 
-#Plot of frequency for NDVI
-matplot(chunckOut$date-6*60*60, t(chunckOut$modisArray[,,1]), pch = 16, cex = 1, 
-        col = adjustcolor("darkgreen", alpha.f = 0.4), type = "l",
-        ylim = c(-0.25, 1), xlim = range(chunckOut$date), xlab = "", ylab = "NDVI")
-
 # Quantiles difference to get amplitude
 quants <- t(apply(chunckOut$modisArray[,,1], 1, function(z) {
-    diffQuants <- quantile(chunckOut$modisArray[,,1], prob = 0.975, na.rm = T) - quantile(chunckOut$modisArray[,,1], prob = 0.025, na.rm = T)
-  tapply(z, format(chunckOut$date, "%Y")
+  # z <- chunckOut$modisArray[1,,1]
+  dat <- ifelse(z<0.05, NA, z)
+  tapply(dat, format(chunckOut$date, "%Y"), function(f) diff(quantile(f, probs = c(0.05, 0.95), na.rm = T)))
 }))
 
+medAmp <- apply(quants, 1, median, na.rm = T)
+sdAmp  <- apply(quants, 1, sd, na.rm = T)
+
+
+#### Amplitude
+## 1) map with median amplitude and sd amplitude (also plot of amplitude and some quantiles across years)
+r0 <- chunckOut$rasterIndex
+r0[!is.na(r0[])] <- medAmp
+plot(r0)
+r0 <- as.data.frame(r0, xy = T, na.rm = T)
+
+r1 <- chunckOut$rasterIndex
+r1[!is.na(r1[])] <- sdAmp
+plot(r1)
+r1 <- as.data.frame(r1, xy = T, na.rm = T)
+
+
+ggplot(r1, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+
+## 2) map of change over years - apply linear model of amplitude over years
+
+
+## 3) create a map with change (slope of linear model) and a plot for the sub region with overall trend and confidence intervals of change/slope
+
+
+plot(quants)
+
+
+#Plot of aplitude of NDVI
+matplot(chunckOut$date-6*60*60, t(quants), pch = 16, cex = 1, 
+        col = adjustcolor("darkgreen", alpha.f = 0.4), type = "l",
+        ylim = c(-0.25, 100), xlim = range(chunckOut$date), xlab = "", ylab = "Amplitude of NDVI")
+
+
+
+
+#Plot of NDVI and NDSI values
 opar <- par(mar = c(4,4,1,4), las = 1)
-matplot(chunkOut$date-6*60*60, t(chunkOut$modisArray[,,1]), pch = 16, cex = 1, 
+matplot(chunckOut$date-6*60*60, t(chunckOut$modisArray[,,1]), pch = 16, cex = 1, 
         col = adjustcolor("darkgreen", alpha.f = 0.4), type = "p",
-        ylim = c(-0.25, 1), xlim = range(chunkOut$date), xlab = "", ylab = "NDVI")
+        ylim = c(-0.25, 1), xlim = range(chunckOut$date), xlab = "", ylab = "NDVI")
 par(new = T)
-matplot(chunkOut$date+6*60*60, t(chunkOut$modisArray[,,2]), pch = 16, cex = 1, 
+matplot(chunckOut$date+6*60*60, t(chunckOut$modisArray[,,2]), pch = 16, cex = 1, 
         col = adjustcolor("cornflowerblue", alpha.f = 0.4), type = "p",
-        ylim = c(0,1), xlim = range(chunkOut$date), xlab = "", ylab = "", yaxt  = "n", xaxt = "n")
+        ylim = c(0,1), xlim = range(chunckOut$date), xlab = "", ylab = "", yaxt  = "n", xaxt = "n")
 axis(4)
 mtext("NDSI", 4, line = 3, las = 3)
 par(opar)
+
+
+#Get first days of each year where NDSI falls below 0.4
+NDSIfirst <- t(apply(chunckOut$modisArray[,,2], 1, function(x) {
+  chunckOut$modisArray[,,2] <- chunckOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
+  sapply(split(data.frame(x, joy = as.numeric(format(chunckOut$date, "%j"))), format(chunckOut$date, "%Y")), function(y) y[min(which(y[,1]<0.4)), 2])
+}))       
+
 
