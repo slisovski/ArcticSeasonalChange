@@ -6,7 +6,7 @@ library(rgee)
 library(tidyverse)
 
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
-drive         <- "~/Documents/20_rasters/"
+drive         <- "G:/My Drive/20_rasters/"
 ## Simeon drive 
 # drive         <- "~/Google Drive/My Drive/rasters/"
 flsModis      <- tibble(path = list.files(drive, pattern = "MODIS_ndvi*", recursive = T)) %>%   
@@ -49,7 +49,7 @@ chunckOut <- list(rasterIndex = indexRast,
                   date        = flsModis$date,
                   modisArray  = modisArray)
 
-save(chunckOut, file = "")
+save(chunckOut, file = "C:/Users/tasos/Desktop/Master Thesis Project!/chunkOut.rda")
 
 
 
@@ -70,7 +70,7 @@ par(opar)
 
 ## To use ggplot we need to convert the array into a dataframe
 
-meltArray <- reshape2::melt(modisArray)
+meltArray <- reshape2::melt(chunckOut$modisArray)
 colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
 meltArray$Index <- as.character(meltArray$Index)
 meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
@@ -97,12 +97,12 @@ plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "gr
 
 ## Replace negative NDVI values with NA (NDSI values can not go below 0, so we can just set all negative values to NA)
 
-meltArray <- reshape2::melt(modisArray)
+meltArray <- reshape2::melt(chunckOut$modisArray)
 colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
 meltArray$Index <- as.character(meltArray$Index)
 meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
                                   Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
-  mutate(Value = ifelse(Value < 0, NA, Value))
+  mutate(Value = ifelse(Value < 0.05, NA, Value))
 
 meltArray$DOY <- as.numeric(meltArray$DOY)
 
@@ -126,15 +126,15 @@ plotArray + scale_color_manual(breaks = c("NDSI", "NDVI"),values = c("blue", "gr
 
 
 ## Get the first day of the year when NDSI falls below 0.3
-meltArray <- reshape2::melt(modisArray)
+meltArray <- reshape2::melt(chunckOut$modisArray)
 colnames(meltArray) <- c("Pixel", "DOY", "Index", "Value")
 meltArray$Index <- as.character(meltArray$Index)
 meltArray <- meltArray %>% mutate(Index = recode(Index, '1' = 'NDVI', '2' = 'NDSI'),
                                   Value = ifelse(Index == 'NDSI', Value / 100, Value)) %>%
   group_split(Index)
 
-snowmelt <- meltArray[[1]] %>%   
-  filter(Value < 0.3) %>% 
+snowmelt <- meltArray[[1]] %>%  
+  filter(Value < 0.4) %>% 
   slice(1)
 
 snowmelt
