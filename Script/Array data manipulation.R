@@ -10,7 +10,7 @@ library(mapview)
 # Load the chunk output
 load("/Users/tasos/Documents/chunkOut.rda")
 # flsMod (get dates for NDVI, since it shoudl be the same for NDSI). I changed the drive location to my drive here
-drive         <- "~/Documents/20_rasters/"
+drive         <- "G:/My Drive/20_rasters/"
 ## Simeon drive 
 # drive         <- "~/Google Drive/My Drive/rasters/"
 flsModis      <- tibble(path = list.files(drive, pattern = "MODIS_ndvi*", recursive = T)) %>%   
@@ -107,21 +107,60 @@ plot(r1)
 r1 <- as.data.frame(r1, xy = T, na.rm = T)
 
 
+ggplot(r0, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
 ggplot(r1, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
 
+# Plot of amplitude 2001
+r2 <- chunckOut$rasterIndex
+r2[!is.na(r2[])] <- quants[,1]
+plot(r2)
+r2 <- as.data.frame(r2, xy = T, na.rm = T)
+
+ggplot(r2, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+
+#95th percentile 
+quant95 <- t(apply(chunckOut$modisArray[,,1], 1, function(z) {
+  # z <- chunckOut$modisArray[1,,1]
+  dat <- ifelse(z<0.05, NA, z)
+  tapply(dat, format(chunckOut$date, "%Y"), function(f) quantile(f, probs = 0.95, na.rm = T))
+}))
+
+
 ## 2) map of change over years - apply linear model of amplitude over years
+t(quants)
+diff(t(quants))
+diffQuants <- t(diff(t(quants)))
+
+
 
 
 ## 3) create a map with change (slope of linear model) and a plot for the sub region with overall trend and confidence intervals of change/slope
 
+# Slope of linear model
+df <- data.frame(year = as.numeric(colnames(quants)), amplitude = quants[1,])
+lm(amplitude ~ year, data = df)
 
-plot(quants)
+amplitudeSlopes <- apply(quants, 1, function(pxl) {
+  if(all(is.na(pxl))){
+    return(NA)
+  }
+  df <- data.frame(year = as.numeric(colnames(quants)), amplitude = pxl)
+  model <- lm(amplitude ~ year, data = df)
+  coef(model)[2]
+})
 
+plot(amplitudeSlopes)
 
-#Plot of aplitude of NDVI
-matplot(chunckOut$date-6*60*60, t(quants), pch = 16, cex = 1, 
-        col = adjustcolor("darkgreen", alpha.f = 0.4), type = "l",
-        ylim = c(-0.25, 100), xlim = range(chunckOut$date), xlab = "", ylab = "Amplitude of NDVI")
+# Map of change (slope)
+r3 <- chunckOut$rasterIndex
+r3[!is.na(r3[])] <- amplitudeSlopes
+plot(r3)
+r3 <- as.data.frame(r3, xy = T, na.rm = T)
+
+ggplot(r3, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+
+# Get confidence intervals
+t.test(amplitudeSlopes)
 
 
 
@@ -140,10 +179,6 @@ mtext("NDSI", 4, line = 3, las = 3)
 par(opar)
 
 
-#Get first days of each year where NDSI falls below 0.4
-NDSIfirst <- t(apply(chunckOut$modisArray[,,2], 1, function(x) {
-  chunckOut$modisArray[,,2] <- chunckOut$modisArray[,,2] /100 #Convert NDSI values to 0 - 1 range
-  sapply(split(data.frame(x, joy = as.numeric(format(chunckOut$date, "%j"))), format(chunckOut$date, "%Y")), function(y) y[min(which(y[,1]<0.4)), 2])
-}))       
+
 
 
