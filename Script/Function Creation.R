@@ -161,3 +161,17 @@ modelling.df %>% ggplot(aes(x=day)) +
   geom_vline(xintercept=NDSI.prob.day, color = "red") +
   lims(x=c(0,365), y=c(0.0,NA))
 
+
+#Putting it all together
+
+greenup.period = max.modelled.NDVI.day - NDSI.prob.day
+
+modelling.df %>% ggplot(aes(x=day)) +
+  geom_point(aes(y=NDSI.binary), color = "blue", alpha = 0.3) + geom_line(aes(y=prediction.NDSI), color = "blue", alpha = 0.3) +
+  geom_vline(xintercept=NDSI.prob.day, color = "blue", size=0.3) +
+  geom_point(aes(y=NDVI), color = "darkgreen", alpha = 0.3) + geom_line(aes(y=prediction.NDVI), color = "darkgreen", alpha = 0.3) +
+  geom_vline(xintercept=max.modelled.NDVI.day, color = "limegreen", size=0.3) +
+  annotate("segment", x=NDSI.prob.day, xend = max.modelled.NDVI.day, y =0.8, yend=0.8, color = "red" ) +
+  annotate("text", x=mean(c(NDSI.prob.day,max.modelled.NDVI.day)), y=0.85, label=sprintf("greenup: %.2f", greenup.period), hjust="center",color="darkred" ) +
+  lims(x=c(0,365), y=c(0.0,NA))
+
