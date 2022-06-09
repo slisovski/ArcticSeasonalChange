@@ -64,7 +64,7 @@ ampMed <- apply(phenArray[,1,], 1, median, na.rm = T)
 raster.df = as.data.frame(chunckOut$rasterIndex, xy = T, na.rm = T)
 raster.df$layer = as.numeric(ampMed)
 
-plot(rasterFromXYZ(raster.df))
+ras = rasterFromXYZ(raster.df)
 
 
 # Median minus standard deviation
@@ -74,6 +74,9 @@ raster.df$layer = as.numeric(ampMed-ampSd)
 
 
 
+
+map = ggplot(raster.df, aes(x=x, y=y)) + geom_raster(mapping = aes(x=x, y=y, fill = layer)) +
+  scale_fill_viridis_c() + coord_cartesian(xlim = c(4110000, 4200000), ylim = c(8050000, 8150000))
 
 
 
