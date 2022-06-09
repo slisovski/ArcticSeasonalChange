@@ -5,6 +5,7 @@ library(raster)
 library(rgee)
 library(tidyverse)
 library(mapview)
+library(RColorBrewer)
 
 
 # Load the chunk output
@@ -107,8 +108,8 @@ plot(r1)
 r1 <- as.data.frame(r1, xy = T, na.rm = T)
 
 
-ggplot(r0, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
-ggplot(r1, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+ggplot(r0, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap() + scale_fill_gradient(low = "yellow", high = "green")
+ggplot(r1, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap() + scale_fill_gradient(low = "yellow", high = "green")
 
 # Plot of amplitude 2001
 r2 <- chunckOut$rasterIndex
@@ -116,7 +117,7 @@ r2[!is.na(r2[])] <- quants[,1]
 plot(r2)
 r2 <- as.data.frame(r2, xy = T, na.rm = T)
 
-ggplot(r2, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+ggplot(r2, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap() + scale_fill_gradient(low = "yellow", high = "green")
 
 #95th percentile 
 quant95 <- t(apply(chunckOut$modisArray[,,1], 1, function(z) {
@@ -125,11 +126,15 @@ quant95 <- t(apply(chunckOut$modisArray[,,1], 1, function(z) {
   tapply(dat, format(chunckOut$date, "%Y"), function(f) quantile(f, probs = 0.95, na.rm = T))
 }))
 
+plot(quant95, type ="p")
+
 
 ## 2) map of change over years - apply linear model of amplitude over years
 t(quants)
 diff(t(quants))
 diffQuants <- t(diff(t(quants)))
+
+
 
 
 
@@ -157,7 +162,7 @@ r3[!is.na(r3[])] <- amplitudeSlopes
 plot(r3)
 r3 <- as.data.frame(r3, xy = T, na.rm = T)
 
-ggplot(r3, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap()
+ggplot(r3, aes(x = x, y = y, fill = layer)) + geom_raster() + coord_quickmap() + scale_fill_gradient(low = "yellow", high = "green")
 
 # Get confidence intervals
 t.test(amplitudeSlopes)
