@@ -27,7 +27,9 @@ text(grid_bbox %>% st_centroid() %>% st_coordinates(), as.character(1:length(gri
 chunck_01    <- grid_bbox[1]
 chunck_02    <- grid_bbox[2]
 
-crds01 <- 
+crds01 <- r0 %>% as.data.frame() %>% st_as_sf(coords = c("y", "y")) %>%
+  st_set_crs(rast_proj) %>% st_transform(4326) %>% st_coordinates() %>% as_tibble() %>% 
+  rownames_to_column(var = "index") %>% filter(!is.na(r0[])) %>% mutate(index = as.numeric(index))
 
 
 # Create pixel dataframes for each grid cell
